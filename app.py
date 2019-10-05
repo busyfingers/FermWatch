@@ -18,7 +18,7 @@ token = config.api["token"]
 # To-date is tomorrow because the timestamp is 00:00:00
 graph_date_from = dt.date.today() - dt.timedelta(days=1)
 graph_date_to = dt.date.today() + dt.timedelta(days=1)
-graph_update_interval = 30 * 60 * 1000  # 30 minutes
+graph_update_interval = 1 * 60 * 1000  # 1 minutes
 date_update_interval = 60 * 60 * 1000  # 60 minutes
 
 
