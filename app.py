@@ -8,11 +8,13 @@ import plotly.graph_objs as go
 import requests
 import pandas as pd
 import datetime as dt
+import json
 
 # Squelch warning about unverified SSL cert for HTTPS - we know the API is OK!
 requests.packages.urllib3.disable_warnings()
 apiUrl = config.api["url"]
 token = config.api["token"]
+headers = {"Authorization": "Bearer " + token}
 
 # Show today's values by default
 # To-date is tomorrow because the timestamp is 00:00:00
@@ -20,12 +22,26 @@ graph_date_from = dt.date.today() - dt.timedelta(days=1)
 graph_date_to = dt.date.today() + dt.timedelta(days=1)
 graph_update_interval = 1 * 60 * 1000  # 1 minutes
 date_update_interval = 60 * 60 * 1000  # 60 minutes
+selected_batch = ""
+fetched_batches = {}
 
 
-def fetchData(date_from, date_to):
-    headers = {"Authorization": "Bearer " + token}
-    params = {"from": date_from, "to": date_to}
-    req = requests.get(apiUrl, headers=headers, params=params, verify=False)
+def fetchBatches():
+    req = requests.get(f"{apiUrl}/batchdata", headers=headers, verify=False)
+    return json.loads(req.text)
+
+
+def fetchData(date_from, date_to, batch_id):
+    params = {}
+
+    if batch_id:
+        params["batchId"] = batch_id
+    else:
+        params["from"] = date_from
+        params["to"] = date_to
+
+    req = requests.get(f"{apiUrl}/temperature",
+                       headers=headers, params=params, verify=False)
 
     return pd.read_json(req.text)
 
@@ -65,6 +81,12 @@ app.layout = html.Div(style={'backgroundColor': colors['background']}, children=
             'horizontal-align': 'center'
         }
     ),
+    dcc.Dropdown(
+        id='batch-selection',
+        value=''
+    ),
+    html.P(id='selected-batch-info',
+           style={'padding': '0.5rem 1rem 1rem 1rem'}),
     dcc.Graph(id='main-graph'),
     dcc.Interval(
         id='interval-component',
@@ -92,21 +114,67 @@ plot_layout = {
 
 @app.callback(Output(component_id='date-from', component_property='date'), [Input(component_id='date-update', component_property='n_intervals')])
 def refreshFromDate(n_intervals):
-    return dt.date.today() - dt.timedelta(days=1)
+    if selected_batch:
+        return None
+    else:
+        return dt.date.today() - dt.timedelta(days=1)
 
 
 @app.callback(Output(component_id='date-to', component_property='date'), [Input(component_id='date-update', component_property='n_intervals')])
 def refreshToDate(n_intervals):
-    return dt.date.today() + dt.timedelta(days=1)
+    if selected_batch:
+        return None
+    else:
+        return dt.date.today() + dt.timedelta(days=1)
+
+
+@app.callback([Output(component_id='date-from', component_property='disabled'),
+               Output(component_id='date-to', component_property='disabled')],
+              [Input(component_id='batch-selection', component_property='value')])
+def toggleDatePickers(batch_id):
+    if batch_id:
+        return True, True
+    else:
+        return False, False
+
+
+@app.callback(Output(component_id='selected-batch-info', component_property='children'),
+              [Input(component_id='batch-selection', component_property='value')])
+def setSelectedBatch(batch_id):
+    selected_batch = batch_id
+
+    if not batch_id:
+        return ""
+    else:
+        fermentation_end = fetched_batches[batch_id][
+            'FermentationEnd'].split('T')[0] if 'FermentationEnd' in fetched_batches[batch_id] else ""
+        return f"Fermentation start: {fetched_batches[batch_id]['FermentationStart'].split('T')[0]}, fermentation end: {fermentation_end}"
+
+@app.callback(Output(component_id='batch-selection', component_property='options'),
+              [Input(component_id='date-update', component_property='n_intervals')])
+def setBatches(n_intervals):
+    # headers = {"Authorization": "Bearer " + token}
+    # req = requests.get(f"{apiUrl}/batchdata", headers=headers, verify=False)
+    # batches = json.loads(req.text)
+    batches = fetchBatches()
+    options = []
+
+    for batch in batches:
+        fetched_batches[batch['Id']] = batch
+        options.append(
+            {'label': f"Batch#{batch['BatchNo']} - {batch['RecipeName']}", 'value': batch['Id']})
+
+    return options
 
 
 @app.callback(
     Output(component_id='main-graph', component_property='figure'),
     [Input(component_id='date-from', component_property='date'),
      Input(component_id='date-to', component_property='date'),
+     Input(component_id='batch-selection', component_property='value'),
      Input(component_id='interval-component', component_property='n_intervals')])
-def reFetchData(date_from, date_to, n_intervals):
-    df = fetchData(date_from, date_to)
+def reFetchData(date_from, date_to, batch_id, n_intervals):
+    df = fetchData(date_from, date_to, batch_id)
 
     if df.empty:
         return {
