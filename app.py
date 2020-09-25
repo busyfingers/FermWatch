@@ -57,6 +57,8 @@ colors = {
     'text': '#0D0D0D'
 }
 
+app.title = 'Fermentation Watcher'
+
 app.layout = html.Div(style={'backgroundColor': colors['background']}, children=[
     html.H1(
         children='Fermentation watcher',
