@@ -1,5 +1,5 @@
 api = dict(
-    url="http://localhost:3000/api/temperature",
+    url="http://localhost:3000/api",
     token=""
 )
 server = dict(
