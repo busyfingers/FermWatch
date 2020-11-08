@@ -32,7 +32,7 @@ fetched_batches = {}
 
 def fetch_fermentation_profile(batch_id):
     if not batch_id:
-        return []
+        return pd.DataFrame()
 
     params = {"batchId": batch_id}
     req = requests.get(f"{apiUrl}/fermentationProfile",
@@ -233,7 +233,7 @@ def reFetchData(date_from, date_to, batch_id, n_intervals):
 
         if last_fp < current_max_measuredAt:
             fp_subset = fp_subset.append(
-                {'TimePoint': current_max_measuredAt, 'Value': fp.iloc[[numFpSubset]]['Value'].values[0]}, ignore_index=True)
+                {'TimePoint': current_max_measuredAt, 'Value': fp.iloc[[numFpSubset - 1]]['Value'].values[0]}, ignore_index=True)
 
         next_fermentation_step = "Next temperature interval: "
 
@@ -249,7 +249,7 @@ def reFetchData(date_from, date_to, batch_id, n_intervals):
         graph_data.append(go.Scatter(
             x=fp_subset["TimePoint"],
             y=fp_subset["Value"],
-            line=dict(color='firebrick', width=3, dash='dash'),
+            line=dict(color='darkred', width=3, dash='dash'),
             name="Fermentation Profile"))
 
     graph_update = {
