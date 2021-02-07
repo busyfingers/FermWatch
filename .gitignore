@@ -1,0 +1,5 @@
+.vscode/
+__pycache__/
+values*.txt
+log.txt
+*py.*
